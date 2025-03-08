@@ -958,7 +958,29 @@ impl<'a> Processor<'a> {
             // Comments are ignored when rendering
             Node::Comment(_, _) => (),
             Node::Text(ref s) | Node::Raw(_, ref s, _) => write!(write, "{}", s)?,
-            Node::VariableBlock(_, ref expr) => self.eval_expression(expr)?.render(write)?,
+            Node::VariableBlock(_, ref expr) => {
+                let evaluated_expr = self.eval_expression(expr);
+
+                match evaluated_expr {
+                    Ok(evaluated_expr) => {
+                        let rendered_evaluated_expr = evaluated_expr.render(write);
+
+                        match rendered_evaluated_expr {
+                            Ok(_) => (),
+                            Err(e) => {
+                                if let ExprVal::Ident(s) = &expr.val {
+                                    write!(write, "{{{{ {} }}}}", s)?;
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if let ExprVal::Ident(s) = &expr.val {
+                            write!(write, "{{{{ {} }}}}", s)?;
+                        }
+                    }
+                }
+            }
             Node::Set(_, ref set) => self.eval_set(set)?,
             Node::FilterSection(_, FilterSection { ref filter, ref body }, _) => {
                 let body = render_to_string(
